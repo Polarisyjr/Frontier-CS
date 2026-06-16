@@ -128,8 +128,25 @@ class ResearchRunner(Runner):
 
         With nested solution structure, problem_id is already the nested path
         (e.g., "cant_be_late/high_availability_loose_deadline_large_overhead").
+
+        Fallback: some task configs flatten a nested variant into a single
+        underscore-joined segment (e.g. "poc_generation/stack_buffer_overflow_arvo_781"
+        instead of "poc_generation/stack_buffer_overflow/arvo_781"). When the
+        direct path is missing, search the track for a directory whose nested
+        path, with '/' replaced by '_', matches the flattened tail.
         """
-        return self.problems_dir / problem_id
+        direct = self.problems_dir / problem_id
+        if direct.exists() or "/" not in problem_id:
+            return direct
+
+        track, _, flat = problem_id.partition("/")
+        track_dir = self.problems_dir / track
+        if track_dir.is_dir():
+            for cand in track_dir.rglob("config.yaml"):
+                rel = cand.parent.relative_to(track_dir)
+                if str(rel).replace("/", "_") == flat:
+                    return cand.parent
+        return direct
 
     def _get_problem_path_or_error(
         self, problem_id: str

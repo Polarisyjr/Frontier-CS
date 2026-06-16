@@ -119,6 +119,15 @@ class ResearchDockerRunner(ResearchRunner):
         """Run the actual evaluation in Docker."""
         start_time = time.time()
 
+        # Normalize a flattened problem_id (e.g. "poc_generation/stack_buffer_overflow_arvo_781")
+        # to the nested form derived from the resolved path so the in-container layout
+        # matches what evaluator.py expects (its ../../../common import depends on the
+        # nesting depth, and common/ is copied per parent level).
+        try:
+            problem_id = str(problem_path.relative_to(self.problems_dir))
+        except ValueError:
+            pass
+
         settings = self._load_runtime_settings(problem_path)
         runtime_config = settings["runtime"]
         docker_config = settings["docker"]
