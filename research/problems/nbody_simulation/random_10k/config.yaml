@@ -1,3 +1,4 @@
+cpu_intensive: true
 tag: hpc
 runtime:
   language: cpp
