@@ -27,7 +27,9 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && rm -rf /var/lib/apt/lists/*
 
 # --- 2. Update npm to latest version ---
-RUN npm install -g npm@latest
+# Node 20 cannot run npm 12 (the current `latest`). Keep npm on the Node-20
+# compatible major so this image remains reproducible as npm publishes new majors.
+RUN npm install -g npm@10
 
 # --- 3. Install go-judge (auto-detect architecture) ---
 # Use pinned version with fallback to avoid GitHub API rate limits
