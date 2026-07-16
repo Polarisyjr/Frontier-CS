@@ -4,6 +4,7 @@ Docker runner for research problems.
 Runs evaluations in local Docker containers.
 """
 
+import os
 import shutil
 import subprocess
 import tempfile
@@ -240,7 +241,11 @@ class ResearchDockerRunner(ResearchRunner):
         uv_project: Optional[str] = None,
     ) -> Tuple[subprocess.CompletedProcess, str]:
         """Run the Docker container."""
-        cmd = ["docker", "run", "--rm"]
+        cidfile = workspace / ".docker.cid"
+        cmd = ["docker", "run", "--rm", "--cidfile", str(cidfile)]
+        coral_run = os.environ.get("MULTIAGENT_CORAL_RUN_DIR")
+        if coral_run:
+            cmd.extend(["--label", f"multiagent.coral_run={coral_run}"])
 
         # GPU flags
         if needs_gpu:
@@ -272,11 +277,28 @@ class ResearchDockerRunner(ResearchRunner):
             cmd = ["timeout", "--foreground", f"{timeout}s"] + cmd
 
         # Execute
-        result = subprocess.run(
-            cmd,
-            capture_output=True,
-            text=True,
-        )
+        try:
+            result = subprocess.run(
+                cmd,
+                capture_output=True,
+                text=True,
+            )
+        finally:
+            # Killing the Docker CLI (for example when CORAL stops at the end of
+            # a measurement window) does not stop its container.  A cidfile lets
+            # us remove that exact evaluator even if `timeout --foreground`
+            # interrupted the client before Docker's --rm path could run.
+            try:
+                container_id = cidfile.read_text().strip()
+            except OSError:
+                container_id = ""
+            if container_id:
+                subprocess.run(
+                    ["docker", "rm", "-f", container_id],
+                    stdout=subprocess.DEVNULL,
+                    stderr=subprocess.DEVNULL,
+                    check=False,
+                )
 
         logs = result.stdout + "\n" + result.stderr
         return result, logs
